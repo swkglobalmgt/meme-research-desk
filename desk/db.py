@@ -1,0 +1,151 @@
+"""Tiny database layer: Postgres (Neon) in production, SQLite for tests/local.
+
+SQL is written with `?` placeholders and translated for Postgres.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timezone
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS runs (
+    id {pk}, started_at TEXT NOT NULL, finished_at TEXT, kind TEXT, stats TEXT, errors TEXT
+);
+CREATE TABLE IF NOT EXISTS pools (
+    pool_address TEXT PRIMARY KEY, token_mint TEXT NOT NULL, name TEXT, symbol TEXT, dex TEXT,
+    pool_created_at TEXT, first_seen_at TEXT NOT NULL, last_snapshot_at TEXT,
+    source TEXT, active INTEGER NOT NULL DEFAULT 1, missing_count INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS pools_token ON pools(token_mint);
+CREATE TABLE IF NOT EXISTS snapshots (
+    id {pk}, pool_address TEXT NOT NULL, ts TEXT NOT NULL, price_usd REAL, liquidity_usd REAL,
+    fdv_usd REAL, vol_m5 REAL, vol_h1 REAL, vol_h6 REAL, vol_h24 REAL,
+    chg_m5 REAL, chg_h1 REAL, chg_h6 REAL, chg_h24 REAL,
+    buys_h1 INTEGER, sells_h1 INTEGER, buyers_h1 INTEGER, sellers_h1 INTEGER, txns_h24 INTEGER
+);
+CREATE INDEX IF NOT EXISTS snapshots_pool_ts ON snapshots(pool_address, ts);
+CREATE TABLE IF NOT EXISTS safety_checks (
+    id {pk}, token_mint TEXT NOT NULL, pool_address TEXT, ts TEXT NOT NULL, passed INTEGER NOT NULL,
+    reasons TEXT, details TEXT
+);
+CREATE INDEX IF NOT EXISTS safety_token_ts ON safety_checks(token_mint, ts);
+CREATE TABLE IF NOT EXISTS signals (
+    id {pk}, strategy TEXT NOT NULL, pool_address TEXT NOT NULL, token_mint TEXT NOT NULL,
+    symbol TEXT, ts TEXT NOT NULL, signal_price REAL, liquidity_usd REAL, details TEXT,
+    status TEXT NOT NULL, status_reason TEXT
+);
+CREATE TABLE IF NOT EXISTS positions (
+    id {pk}, strategy TEXT NOT NULL, signal_id INTEGER, pool_address TEXT NOT NULL,
+    token_mint TEXT NOT NULL, symbol TEXT, size_usd REAL NOT NULL,
+    signal_ts TEXT, signal_price REAL, entry_ts TEXT, entry_price REAL, entry_liquidity REAL,
+    entry_slippage_pct REAL, tokens REAL, status TEXT NOT NULL,
+    take_profit_price REAL, stop_loss_price REAL, max_hold_until TEXT, last_candle_ts INTEGER,
+    exit_ts TEXT, exit_price REAL, exit_liquidity REAL, exit_slippage_pct REAL, exit_reason TEXT,
+    is_rug INTEGER DEFAULT 0, proceeds_usd REAL, fixed_costs_usd REAL, net_pnl_usd REAL, net_return REAL
+);
+CREATE INDEX IF NOT EXISTS positions_strategy ON positions(strategy, status);
+"""
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def parse_ts(s: str | None) -> datetime | None:
+    if not s:
+        return None
+    s = s.replace("Z", "+00:00")
+    dt = datetime.fromisoformat(s)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+class DB:
+    def __init__(self, url: str | None = None):
+        url = url or os.environ.get("DATABASE_URL") or "sqlite:///desk.sqlite3"
+        self.url = url
+        if url.startswith(("postgres://", "postgresql://")):
+            import psycopg  # only needed in production
+            self.kind = "pg"
+            self.conn = psycopg.connect(url, autocommit=False)
+        else:
+            self.kind = "sqlite"
+            path = url.replace("sqlite:///", "", 1) if url.startswith("sqlite:///") else url
+            self.conn = sqlite3.connect(path)
+            self.conn.row_factory = sqlite3.Row
+
+    # -- helpers -----------------------------------------------------------
+    def _sql(self, sql: str) -> str:
+        return sql.replace("?", "%s") if self.kind == "pg" else sql
+
+    def init(self) -> None:
+        pk = "BIGSERIAL PRIMARY KEY" if self.kind == "pg" else "INTEGER PRIMARY KEY AUTOINCREMENT"
+        for stmt in SCHEMA.format(pk=pk).split(";"):
+            if stmt.strip():
+                self.execute(stmt)
+        self.commit()
+
+    def execute(self, sql: str, params: tuple | list = ()):
+        cur = self.conn.cursor()
+        cur.execute(self._sql(sql), tuple(params))
+        return cur
+
+    def insert(self, table: str, row: dict) -> int:
+        cols = ", ".join(row)
+        qs = ", ".join("?" for _ in row)
+        vals = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in row.values()]
+        if self.kind == "pg":
+            cur = self.execute(f"INSERT INTO {table} ({cols}) VALUES ({qs}) RETURNING id", vals)
+            return cur.fetchone()[0]
+        cur = self.execute(f"INSERT INTO {table} ({cols}) VALUES ({qs})", vals)
+        return cur.lastrowid
+
+    def update(self, table: str, key: str, key_val, row: dict) -> None:
+        sets = ", ".join(f"{c} = ?" for c in row)
+        vals = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in row.values()]
+        self.execute(f"UPDATE {table} SET {sets} WHERE {key} = ?", [*vals, key_val])
+
+    def all(self, sql: str, params: tuple | list = ()) -> list[dict]:
+        cur = self.execute(sql, params)
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+    def one(self, sql: str, params: tuple | list = ()) -> dict | None:
+        rows = self.all(sql, params)
+        return rows[0] if rows else None
+
+    def upsert_pool(self, row: dict) -> bool:
+        """Insert a pool if new. Returns True if it was new."""
+        if self.one("SELECT pool_address FROM pools WHERE pool_address = ?", [row["pool_address"]]):
+            return False
+        self.insert("pools", row)
+        return True
+
+    def commit(self) -> None:
+        self.conn.commit()
+
+    def rollback(self) -> None:
+        self.conn.rollback()
+
+    def close(self) -> None:
+        self.conn.close()
+
+
+@contextmanager
+def connect(url: str | None = None):
+    db = DB(url)
+    try:
+        db.init()
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
