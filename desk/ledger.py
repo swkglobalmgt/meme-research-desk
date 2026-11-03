@@ -172,9 +172,23 @@ def manage_open(db: DB, now: datetime, get_candles, latest_snapshot, log: list,
         pool = db.one("SELECT missing_count FROM pools WHERE pool_address = ?", [pos["pool_address"]])
         missing = (pool or {}).get("missing_count") or 0
 
+        max_hold_epoch = int(parse_ts(pos["max_hold_until"]).timestamp())
         if is_rug(pos["entry_liquidity"], liq_now) or missing >= 2:
-            price = (snap or {}).get("price_usd") or 0.0
-            _close(db, pos, now, price, "rug", liq_now if missing < 2 else 0.0, rug=True)
+            # A bot watching continuously gets a chance to hit its stop on the way down
+            # (at the gap price if it gapped). Only if no candle shows that do we sell now.
+            liq_exit = liq_now if missing < 2 else 0.0
+            try:
+                rc = completed(get_candles(pos["pool_address"]), now)
+            except Exception:
+                rc = []
+            hit = scan_exit(rc, int(pos["last_candle_ts"] or 0), pos["take_profit_price"],
+                            pos["stop_loss_price"], max_hold_epoch, leader_exit(pos))
+            if hit:
+                ts, price, reason = hit
+                _close(db, pos, datetime.fromtimestamp(ts, tz=timezone.utc), price, reason, liq_exit, rug=True)
+            else:
+                price = (snap or {}).get("price_usd") or 0.0
+                _close(db, pos, now, price, "rug", liq_exit, rug=True)
             log.append(f"RUG {pos['strategy']} {pos['symbol']} liquidity {liq_now}")
             continue
         try:
@@ -182,7 +196,6 @@ def manage_open(db: DB, now: datetime, get_candles, latest_snapshot, log: list,
         except Exception as e:
             log.append(f"candles failed for position {pos['id']}: {e}")
             continue
-        max_hold_epoch = int(parse_ts(pos["max_hold_until"]).timestamp())
         hit = scan_exit(candles, int(pos["last_candle_ts"] or 0), pos["take_profit_price"],
                         pos["stop_loss_price"], max_hold_epoch, leader_exit(pos))
         if hit:
