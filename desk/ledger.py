@@ -40,13 +40,20 @@ def find_fill(candles: list[tuple], signal_epoch: int, c: Costs = COSTS):
     return None
 
 
-def scan_exit(candles: list[tuple], after_ts: int, tp: float, sl: float, max_hold_epoch: int):
-    """Walk candles after `after_ts`. Return (ts, price, reason) at first exit, or None."""
+def scan_exit(candles: list[tuple], after_ts: int, tp: float, sl: float, max_hold_epoch: int,
+              leader_exit_epoch: int | None = None):
+    """Walk candles after `after_ts`. Return (ts, price, reason) at first exit, or None.
+
+    leader_exit_epoch: for copy trades, when we would follow the leader out. We
+    sell at the LOW of that minute (worst case).
+    """
     for ts, o, h, l, cl, v in candles:
         if ts <= after_ts:
             continue
         if ts >= max_hold_epoch:
             return ts, o, "max_hold"
+        if leader_exit_epoch is not None and ts >= leader_exit_epoch:
+            return ts, l, "leader_sold"
         if o <= sl:
             return ts, o, "stop_loss"          # gapped through the stop
         if l <= sl:
@@ -146,13 +153,14 @@ def fill_pending(db: DB, now: datetime, get_candles, log: list) -> None:
             "take_profit_price": market_price * (1 + strat.take_profit_pct / 100),
             "stop_loss_price": market_price * (1 - strat.stop_loss_pct / 100),
             "max_hold_until": iso(entry_dt + timedelta(minutes=strat.max_hold_minutes)),
-            "last_candle_ts": fill_ts,
+            "last_candle_ts": fill_ts, "leader": sig.get("leader"),
         })
         db.update("signals", "id", sig["id"], {"status": "filled"})
         log.append(f"FILLED {strat.name} {sig['symbol']} @ {market_price:.10g}")
 
 
-def manage_open(db: DB, now: datetime, get_candles, latest_snapshot, log: list) -> None:
+def manage_open(db: DB, now: datetime, get_candles, latest_snapshot, log: list,
+                leader_exit=lambda pos: None) -> None:
     """Check every open position for rug, stop, take-profit or max hold."""
     for pos in db.all("SELECT * FROM positions WHERE status = 'open' ORDER BY id"):
         snap = latest_snapshot(pos["pool_address"])
@@ -172,7 +180,7 @@ def manage_open(db: DB, now: datetime, get_candles, latest_snapshot, log: list) 
             continue
         max_hold_epoch = int(parse_ts(pos["max_hold_until"]).timestamp())
         hit = scan_exit(candles, int(pos["last_candle_ts"] or 0), pos["take_profit_price"],
-                        pos["stop_loss_price"], max_hold_epoch)
+                        pos["stop_loss_price"], max_hold_epoch, leader_exit(pos))
         if hit:
             ts, price, reason = hit
             _close(db, pos, datetime.fromtimestamp(ts, tz=timezone.utc), price, reason, liq_now, rug=False)

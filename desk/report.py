@@ -102,6 +102,19 @@ def build(db: DB, now: datetime) -> dict:
         "safety_checks": db.one("SELECT COUNT(*) AS n FROM safety_checks")["n"],
         "safety_passed": db.one("SELECT COUNT(*) AS n FROM safety_checks WHERE passed = 1")["n"],
     }
+    # Copy-trading: who we follow and how each one is doing for US (after costs).
+    leaders = db.all("SELECT wallet, active, selected_at FROM leaders ORDER BY selected_at")
+    per = []
+    for L in leaders:
+        trades = db.all("SELECT * FROM positions WHERE leader = ? AND status = 'closed' ORDER BY exit_ts",
+                        [L["wallet"]])
+        sm = summarize(trades)
+        per.append({"wallet": L["wallet"], "active": bool(L["active"]), "since": L["selected_at"],
+                    "trades": sm["trades"], "net_pnl_usd": sm["net_pnl_usd"], "win_rate": sm["win_rate"],
+                    "t_stat": sm["t_stat"], "rugs": sm["rugs"]})
+    screen = db.one("SELECT ts, candidates, selected, error FROM leader_screens ORDER BY ts DESC LIMIT 1")
+    out["copy"] = {"leaders": per, "last_screen": screen}
+
     reasons = Counter()
     for r in db.all("SELECT reasons FROM safety_checks WHERE passed = 0"):
         rs = json.loads(r["reasons"]) if isinstance(r["reasons"], str) else (r["reasons"] or [])
@@ -172,6 +185,23 @@ def markdown(r: dict) -> str:
     lines += ["", "## Signals by strategy"]
     for n in names:
         lines.append(f"- {n}: {r['strategies'][n]['signals'] or 'none yet'}")
+    c = r.get("copy") or {}
+    lines += ["", "## Copy-trading fomo traders"]
+    sc = c.get("last_screen")
+    if not sc:
+        lines.append("- Not screened yet (needs the DUNE_API_KEY secret).")
+    elif sc.get("error"):
+        lines.append(f"- Last screen FAILED at {sc['ts']}: {sc['error']}")
+    else:
+        lines.append(f"- Last screen {sc['ts']}: {sc['candidates']} fomo wallets with realized profit, "
+                     f"{sc['selected']} passed the consistency rules.")
+    if c.get("leaders"):
+        lines += ["", "| Wallet | Following | Since | Our trades | Our net P&L | Win rate | t | Rugs |",
+                  "|---|---|---|---|---|---|---|---|"]
+        for L in c["leaders"]:
+            lines.append(f"| `{L['wallet'][:6]}…{L['wallet'][-4:]}` | {'yes' if L['active'] else 'no'} | "
+                         f"{L['since'][:10]} | {L['trades']} | {_money(L['net_pnl_usd'])} | {_pct(L['win_rate'])} | "
+                         f"{_t(L['t_stat'])} | {L['rugs']} |")
     lines += ["", "_Note: with several strategies tested at once, one can pass t ≥ 2 by luck. "
               "Treat a pass below t ≈ 2.5 with extra suspicion._"]
     return "\n".join(lines) + "\n"

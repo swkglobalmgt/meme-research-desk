@@ -30,6 +30,24 @@ Every 30 minutes GitHub runs one research cycle:
 5. **Report.** Win rate, average win/loss, net P&L after all costs, worst drawdown,
    rugs hit, and a pass/fail decision gate, separately for each strategy.
 
+## Copy-trading fomo traders (`copy_trader`)
+
+fomo's leaderboard mostly shows paper gains on coins traders still hold. So instead, once a week the
+desk asks Dune (free plan) for fomo wallets with **realized** profit over the last 30 days. Each fomo
+swap is recognised on-chain by fomo's sponsor wallet and USDC fee wallet, the same method DeFiLlama
+uses. A trader is followed only if they:
+20+ fully closed positions · profitable in 3+ of the last ~4 weeks · still profitable over 7 days ·
+no single coin is more than half their profit · win rate ≥ 35% · normal position sizes (not dust, not whales).
+Up to 20 are followed, ranked by profit per dollar risked.
+
+Then every 30 minutes the desk reads their new trades straight from the Solana blockchain.
+**Only trades made after a trader was picked count.** No history is back-filled.
+We buy 60s+ after they buy (all safety filters apply) and sell 60s after they sell, at the
+worst price of that minute, or earlier on our own stop/target/max hold. If a coin has already rugged by
+the time we notice their buy, the trade still counts as a full loss. Results are shown per trader.
+
+Needs the `DUNE_API_KEY` secret (free account at dune.com).
+
 ## Realistic costs (deliberately pessimistic)
 
 - We act **at least 60 seconds after** the price we saw, and pay the **highest price of that minute**.

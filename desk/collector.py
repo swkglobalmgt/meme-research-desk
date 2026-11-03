@@ -117,12 +117,13 @@ def latest_snapshot(db: DB, pool: str) -> dict | None:
 # Safety checks (expensive source data cached for SAFETY_RECHECK_MINUTES)
 # ---------------------------------------------------------------------------
 
-def check_safety(db: DB, snap: dict, now: datetime, position_usd: float) -> safety.SafetyResult:
+def check_safety(db: DB, snap: dict, now: datetime, position_usd: float,
+                 as_of: datetime | None = None) -> safety.SafetyResult:
     mint = snap["token_mint"]
     since = iso(now - timedelta(minutes=config.SAFETY_RECHECK_MINUTES))
     cached = db.one("SELECT details FROM safety_checks WHERE token_mint = ? AND ts >= ? "
                     "ORDER BY ts DESC LIMIT 1", [mint, since])
-    age = age_hours(snap.get("pool_created_at"), now)
+    age = age_hours(snap.get("pool_created_at"), as_of or now)
     facts = None
     if cached:
         facts = json.loads(cached["details"]) if isinstance(cached["details"], str) else cached["details"]

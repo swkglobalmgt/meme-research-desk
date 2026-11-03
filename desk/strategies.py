@@ -52,6 +52,8 @@ _PER_POOL = {"momentum": momentum, "volume_breakout": volume_breakout, "pullback
 
 
 def select(strategy: Strategy, snaps: list[dict]) -> list[dict]:
+    if strategy.name == "copy_trader":
+        return []  # driven by leaders' trades, see copytrade.py
     if strategy.name == "founder_screen":
         return founder_screen(snaps, strategy.params)
     fn = _PER_POOL[strategy.name]

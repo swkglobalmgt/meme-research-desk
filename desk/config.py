@@ -103,6 +103,39 @@ STRATEGIES = {
     ]
 }
 
+STRATEGIES["copy_trader"] = Strategy(
+    name="copy_trader",
+    description=("Paper-copy fomo traders chosen for consistent REALIZED profit (from public on-chain data). "
+                 "Buy 60s+ after they buy (safety filters still apply); sell when they sell, or at our stop/target/max hold."),
+    max_open_positions=30,
+    reentry_cooldown_hours=24,
+    params={},
+)
+
+
+@dataclass(frozen=True)
+class CopyRules:
+    """How fomo traders get picked to follow. Judged on what they actually cashed out."""
+    lookback_days: int = 30
+    min_closed_positions: int = 20      # fully sold positions in the window
+    min_positive_weeks: int = 3         # weeks with positive realized P&L (of ~4)
+    max_best_trade_share: float = 0.5   # one lucky coin can't be most of the profit
+    min_win_rate: float = 0.35
+    require_positive_7d: bool = True
+    min_median_position_usd: float = 20.0   # ignore dust traders
+    max_median_position_usd: float = 25_000.0  # whales move prices; we can't copy their fills
+    max_leaders: int = 20
+    max_open_per_leader: int = 5
+    refresh_days: int = 7               # re-run the Dune screen weekly (uses free credits)
+    max_new_txs_per_leader: int = 25    # per cycle, keeps RPC usage small
+
+
+COPY = CopyRules()
+FOMO_FEE_WALLET = "R4rNJHaffSUotNmqSKNEfDcJE8A7zJUkaoM5Jkd7cYX"
+FOMO_GAS_SPONSOR = "AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51"
+QUOTE_MINTS = {USDC_MINT, "So11111111111111111111111111111111111111112",
+               "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"}
+
 # Tokens the founder asked to watch by hand (still must pass every safety filter).
 WATCH_TOKENS = [
     "EDM8ynBGuaxXex6Lx78Q4WYDNtH6F6ANPvmi72Mspump",  # from founder's GMGN link, 2026-11-02

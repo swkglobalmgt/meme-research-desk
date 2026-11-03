@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS safety_token_ts ON safety_checks(token_mint, ts);
 CREATE TABLE IF NOT EXISTS signals (
     id {pk}, strategy TEXT NOT NULL, pool_address TEXT NOT NULL, token_mint TEXT NOT NULL,
     symbol TEXT, ts TEXT NOT NULL, signal_price REAL, liquidity_usd REAL, details TEXT,
-    status TEXT NOT NULL, status_reason TEXT
+    status TEXT NOT NULL, status_reason TEXT, leader TEXT
 );
 CREATE TABLE IF NOT EXISTS positions (
     id {pk}, strategy TEXT NOT NULL, signal_id INTEGER, pool_address TEXT NOT NULL,
@@ -44,10 +44,26 @@ CREATE TABLE IF NOT EXISTS positions (
     entry_slippage_pct REAL, tokens REAL, status TEXT NOT NULL,
     take_profit_price REAL, stop_loss_price REAL, max_hold_until TEXT, last_candle_ts INTEGER,
     exit_ts TEXT, exit_price REAL, exit_liquidity REAL, exit_slippage_pct REAL, exit_reason TEXT,
-    is_rug INTEGER DEFAULT 0, proceeds_usd REAL, fixed_costs_usd REAL, net_pnl_usd REAL, net_return REAL
+    is_rug INTEGER DEFAULT 0, proceeds_usd REAL, fixed_costs_usd REAL, net_pnl_usd REAL, net_return REAL,
+    leader TEXT
 );
+CREATE TABLE IF NOT EXISTS leaders (
+    wallet TEXT PRIMARY KEY, source TEXT, selected_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+    stats TEXT, last_sig TEXT, last_checked TEXT, deactivated_at TEXT
+);
+CREATE TABLE IF NOT EXISTS leader_screens (
+    id {pk}, ts TEXT NOT NULL, candidates INTEGER, selected INTEGER, rows TEXT, error TEXT
+);
+CREATE TABLE IF NOT EXISTS leader_trades (
+    sig TEXT PRIMARY KEY, wallet TEXT NOT NULL, block_time TEXT NOT NULL, mint TEXT NOT NULL,
+    side TEXT NOT NULL, quote_delta REAL, token_delta REAL, seen_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS leader_trades_wallet ON leader_trades(wallet, mint, block_time);
 CREATE INDEX IF NOT EXISTS positions_strategy ON positions(strategy, status);
 """
+
+
+NO_ID_TABLES = {"pools", "leaders", "leader_trades"}
 
 
 def utcnow() -> datetime:
@@ -101,6 +117,9 @@ class DB:
         qs = ", ".join("?" for _ in row)
         vals = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in row.values()]
         if self.kind == "pg":
+            if table in NO_ID_TABLES:
+                self.execute(f"INSERT INTO {table} ({cols}) VALUES ({qs})", vals)
+                return 0
             cur = self.execute(f"INSERT INTO {table} ({cols}) VALUES ({qs}) RETURNING id", vals)
             return cur.fetchone()[0]
         cur = self.execute(f"INSERT INTO {table} ({cols}) VALUES ({qs})", vals)

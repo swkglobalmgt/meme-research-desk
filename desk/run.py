@@ -9,7 +9,7 @@ import traceback
 from datetime import timedelta
 from pathlib import Path
 
-from . import collector, config, ledger, report, strategies
+from . import collector, config, copytrade, ledger, report, strategies
 from .db import connect, iso, utcnow
 from .sources import geckoterminal as gt
 
@@ -37,7 +37,17 @@ def cycle(db, log: list) -> dict:
         return candle_cache[pool]
 
     ledger.fill_pending(db, now, candles, log)
-    ledger.manage_open(db, now, candles, lambda p: collector.latest_snapshot(db, p), log)
+    ledger.manage_open(db, now, candles, lambda p: collector.latest_snapshot(db, p), log,
+                       leader_exit=lambda pos: copytrade.leader_exit_epoch(db, pos))
+    db.commit()
+
+    # Copy-trading: re-screen fomo traders weekly, then look for their new trades.
+    try:
+        stats["copy_trader"] = copytrade.cycle(db, now, log)
+    except Exception as e:  # never let one source break the whole run
+        db.rollback()
+        stats["copy_trader"] = {"status": f"error: {e}"}
+        log.append(f"copy_trader error: {e}")
     db.commit()
 
     # New signals from this run's snapshots.

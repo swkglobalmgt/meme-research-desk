@@ -28,13 +28,14 @@ def _wait(host: str) -> None:
     _last_call[host] = time.monotonic()
 
 
-def get_json(url: str, params: dict | None = None, retries: int = 3, timeout: float = 20.0):
+def get_json(url: str, params: dict | None = None, retries: int = 3, timeout: float = 20.0,
+             headers: dict | None = None):
     host = urlparse(url).netloc
     last_err = None
     for attempt in range(retries):
         _wait(host)
         try:
-            r = _session.get(url, params=params, timeout=timeout)
+            r = _session.get(url, params=params, timeout=timeout, headers=headers)
             if r.status_code == 429:
                 time.sleep(10 * (attempt + 1))
                 last_err = FetchError(f"429 rate limited: {url}")
@@ -54,13 +55,14 @@ def get_json(url: str, params: dict | None = None, retries: int = 3, timeout: fl
     raise FetchError(str(last_err))
 
 
-def post_json(url: str, payload: dict, retries: int = 3, timeout: float = 20.0):
+def post_json(url: str, payload: dict, retries: int = 3, timeout: float = 20.0,
+              headers: dict | None = None):
     host = urlparse(url).netloc
     last_err = None
     for attempt in range(retries):
         _wait(host)
         try:
-            r = _session.post(url, json=payload, timeout=timeout)
+            r = _session.post(url, json=payload, timeout=timeout, headers=headers)
             if r.status_code == 429 or r.status_code >= 500:
                 last_err = FetchError(f"{r.status_code} from {url}")
                 time.sleep(3 * (attempt + 1))
