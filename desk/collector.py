@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 from . import config, safety
 from .db import DB, iso, parse_ts
+from .sources import dexscreener as dex
 from .sources import geckoterminal as gt
 from .sources import onchain
 from .sources.http import FetchError
@@ -54,6 +55,24 @@ def collect(db: DB, now: datetime, log: list) -> dict:
     for page in range(1, config.TRENDING_PAGES + 1):
         for p in grab(gt.trending_pools, page, label=f"trending p{page}"):
             seen.setdefault(p["pool_address"], (p, "trending"))
+    for page in range(1, config.TRENDING_5M_PAGES + 1):
+        for p in grab(gt.trending_pools_5m, page, label=f"trending5m p{page}"):
+            seen.setdefault(p["pool_address"], (p, "trending_5m"))
+
+    # DexScreener lists: tokens getting attention (profiles, paid promotion).
+    dex_mints: dict[str, str] = {}
+    for src, path in dex.LISTS.items():
+        for m in grab(dex.solana_tokens, path, label=src):
+            dex_mints.setdefault(m, src)
+    known = {p["token_mint"] for p, _ in seen.values()}
+    todo = [m for m in dex_mints if m not in known][: config.DEX_LIST_MAX_TOKENS]
+    stats["dex_tokens"] = len(dex_mints)
+    if todo:
+        top = grab(gt.top_pool_addresses, todo, label="top pools for dex tokens") or {}
+        addr_src = {a: dex_mints[m] for m, a in top.items()}
+        for p in grab(gt.pools_multi, list(addr_src), label="pools for dex tokens"):
+            seen.setdefault(p["pool_address"], (p, addr_src.get(p["pool_address"], "dexscreener")))
+
     for mint in config.WATCH_TOKENS:
         pools = grab(gt.token_pools, mint, label=f"watch token {mint[:6]}")
         if pools:  # the deepest pool for a hand-picked token

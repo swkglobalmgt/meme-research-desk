@@ -14,6 +14,7 @@ Realism rules:
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 from . import costs
@@ -110,7 +111,7 @@ def record_signal(db: DB, strategy: str, snap: dict, now: datetime, status: str,
 
 def _close(db: DB, pos: dict, exit_dt: datetime, price: float, reason: str,
            liq_now: float | None, rug: bool) -> None:
-    s = costs.sell(pos["tokens"], price, liq_now)
+    s = costs.sell(pos["tokens"], price, liq_now, extra_slippage_pct=pos.get("cost_adj_pct") or 0.0)
     if not s["sellable"]:
         reason = "unsellable" if reason != "rug" else reason
     pnl = costs.trade_pnl(pos["size_usd"], s["proceeds_usd"])
@@ -142,7 +143,10 @@ def fill_pending(db: DB, now: datetime, get_candles, log: list) -> None:
             db.update("signals", "id", sig["id"], {"status": "cancelled", "status_reason": "no trades in fill window"})
             continue
         fill_ts, market_price = res
-        b = costs.buy(strat.position_usd, market_price, sig["liquidity_usd"])
+        d = sig.get("details")
+        d = json.loads(d) if isinstance(d, str) else (d or {})
+        extra = costs.quote_extra_pct(d.get("quoted_sell_cost_pct"), strat.position_usd, sig["liquidity_usd"])
+        b = costs.buy(strat.position_usd, market_price, sig["liquidity_usd"], extra_slippage_pct=extra)
         entry_dt = datetime.fromtimestamp(fill_ts, tz=timezone.utc)
         db.insert("positions", {
             "strategy": strat.name, "signal_id": sig["id"], "pool_address": sig["pool_address"],
@@ -153,7 +157,7 @@ def fill_pending(db: DB, now: datetime, get_candles, log: list) -> None:
             "take_profit_price": market_price * (1 + strat.take_profit_pct / 100),
             "stop_loss_price": market_price * (1 - strat.stop_loss_pct / 100),
             "max_hold_until": iso(entry_dt + timedelta(minutes=strat.max_hold_minutes)),
-            "last_candle_ts": fill_ts, "leader": sig.get("leader"),
+            "last_candle_ts": fill_ts, "leader": sig.get("leader"), "cost_adj_pct": extra,
         })
         db.update("signals", "id", sig["id"], {"status": "filled"})
         log.append(f"FILLED {strat.name} {sig['symbol']} @ {market_price:.10g}")

@@ -115,6 +115,18 @@ def build(db: DB, now: datetime) -> dict:
     screen = db.one("SELECT ts, candidates, selected, error FROM leader_screens ORDER BY ts DESC LIMIT 1")
     out["copy"] = {"leaders": per, "last_screen": screen}
 
+    # Cost check: real Jupiter sell quotes vs our cost model (one swap, our size).
+    q, m = [], []
+    for r in db.all("SELECT details FROM signals WHERE details IS NOT NULL"):
+        d = json.loads(r["details"]) if isinstance(r["details"], str) else (r["details"] or {})
+        if d.get("quoted_sell_cost_pct") is not None and d.get("model_sell_cost_pct") is not None:
+            q.append(float(d["quoted_sell_cost_pct"]))
+            m.append(float(d["model_sell_cost_pct"]))
+    bumped = db.one("SELECT COUNT(*) AS n FROM positions WHERE cost_adj_pct > 0")["n"]
+    out["cost_check"] = {"n": len(q), "median_quoted": _median(q), "median_model": _median(m),
+                         "share_worse": (sum(1 for a, b in zip(q, m) if a > b) / len(q)) if q else None,
+                         "trades_bumped": bumped}
+
     reasons = Counter()
     for r in db.all("SELECT reasons FROM safety_checks WHERE passed = 0"):
         rs = json.loads(r["reasons"]) if isinstance(r["reasons"], str) else (r["reasons"] or [])
@@ -122,6 +134,14 @@ def build(db: DB, now: datetime) -> dict:
             reasons[_bucket(x)] += 1
     out["safety_fail_reasons"] = reasons.most_common(12)
     return out
+
+
+def _median(xs: list[float]) -> float | None:
+    if not xs:
+        return None
+    s = sorted(xs)
+    n = len(s)
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
 
 
 def _bucket(reason: str) -> str:
@@ -182,6 +202,15 @@ def markdown(r: dict) -> str:
               f"- Safety checks: {f['safety_checks']:,} · passed: {f['safety_passed']:,}", "",
               "Most common safety failures:"]
     lines += [f"- {k}: {v}" for k, v in r["safety_fail_reasons"]] or ["- none yet"]
+    cc = r.get("cost_check") or {}
+    lines += ["", "## Cost check (are our cost assumptions honest?)"]
+    if not cc.get("n"):
+        lines.append("- No real sell quotes collected yet.")
+    else:
+        lines.append(f"- Real Jupiter sell quotes collected: {cc['n']}. Median real cost of one sell: "
+                     f"{cc['median_quoted']:.1f}% vs our model {cc['median_model']:.1f}%.")
+        lines.append(f"- Quote was worse than our model {100 * cc['share_worse']:.0f}% of the time. "
+                     f"When it was, that trade was charged the real (worse) cost: {cc['trades_bumped']} trades so far.")
     lines += ["", "## Signals by strategy"]
     for n in names:
         lines.append(f"- {n}: {r['strategies'][n]['signals'] or 'none yet'}")

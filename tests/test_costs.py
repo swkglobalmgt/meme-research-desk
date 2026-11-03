@@ -60,3 +60,19 @@ def test_rug_loses_everything_plus_fees():
 def test_buy_rejects_bad_price():
     with pytest.raises(ValueError):
         costs.buy(100, 0, 50_000, C)
+
+
+def test_quote_extra_only_when_reality_is_worse():
+    model = costs.one_way_cost_pct(100, 50_000, C)          # 0.5 + 2 + ~0.4
+    assert costs.quote_extra_pct(None, 100, 50_000, C) == 0.0
+    assert costs.quote_extra_pct(1.0, 100, 50_000, C) == 0.0     # reality cheaper: keep our worse model
+    assert costs.quote_extra_pct(model + 3.0, 100, 50_000, C) == pytest.approx(3.0)
+
+
+def test_extra_slippage_makes_trades_worse():
+    base = costs.buy(100, 1.0, 50_000, C)
+    worse = costs.buy(100, 1.0, 50_000, C, extra_slippage_pct=3.0)
+    assert worse["tokens"] < base["tokens"]
+    s1 = costs.sell(base["tokens"], 1.0, 50_000, C)
+    s2 = costs.sell(base["tokens"], 1.0, 50_000, C, extra_slippage_pct=3.0)
+    assert s2["proceeds_usd"] < s1["proceeds_usd"]

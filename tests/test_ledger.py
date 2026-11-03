@@ -136,3 +136,28 @@ def test_cooldown_and_open_count(db):
     assert not ledger.in_cooldown(db, "pullback", "MINT", NOW)        # strategies are independent
     assert not ledger.in_cooldown(db, "momentum", "MINT", NOW + timedelta(hours=25))
     assert ledger.open_count(db, "momentum") == 1
+
+
+def test_real_quote_worse_than_model_is_charged(db):
+    ledger.record_signal(db, "momentum", SNAP, datetime.fromtimestamp(T0, tz=timezone.utc), "pending",
+                         details={"quoted_sell_cost_pct": 12.0, "model_sell_cost_pct": 2.7})
+    candles = [c(T0 + 60, 1.0, 1.0, 1.0, 1.0)]
+    ledger.fill_pending(db, NOW, lambda p: candles, [])
+    pos = db.one("SELECT * FROM positions")
+    model = costs.one_way_cost_pct(100, 100_000)
+    assert pos["cost_adj_pct"] == pytest.approx(12.0 - model)
+    assert pos["tokens"] < costs.buy(100, 1.0, 100_000)["tokens"]
+
+
+def test_migration_adds_column_to_old_database(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.db"
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE positions (id INTEGER PRIMARY KEY, strategy TEXT NOT NULL, pool_address TEXT NOT NULL, "
+                "token_mint TEXT NOT NULL, size_usd REAL NOT NULL, status TEXT NOT NULL)")
+    con.commit(); con.close()
+    d = DB(f"sqlite:///{path}")
+    d.init()
+    cols = [r[1] for r in d.conn.execute("PRAGMA table_info(positions)").fetchall()]
+    assert "cost_adj_pct" in cols
+    d.close()

@@ -22,6 +22,7 @@ class SafetyResult:
     passed: bool
     reasons: list[str] = field(default_factory=list)   # why it failed (empty if passed)
     checks: dict[str, bool] = field(default_factory=dict)
+    facts: dict = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +137,7 @@ def build_facts(*, snapshot: dict, age_hours: float | None, mint: dict | None,
 # ---------------------------------------------------------------------------
 
 def evaluate(f: dict, rules: SafetyRules = SAFETY) -> SafetyResult:
-    r = SafetyResult(passed=True)
+    r = SafetyResult(passed=True, facts=f)
 
     def check(name: str, ok: bool, why: str) -> None:
         r.checks[name] = ok

@@ -9,7 +9,7 @@ import traceback
 from datetime import timedelta
 from pathlib import Path
 
-from . import collector, config, copytrade, ledger, report, strategies
+from . import collector, config, copytrade, costs, ledger, report, strategies
 from .db import connect, iso, utcnow
 from .sources import geckoterminal as gt
 
@@ -64,12 +64,16 @@ def cycle(db, log: list) -> dict:
                 counts["skipped"] += 1
                 continue
             res = collector.check_safety(db, s, now, strat.position_usd)
+            cost_check = {"quoted_sell_cost_pct": res.facts.get("sell_loss_pct"),
+                          "model_sell_cost_pct": round(costs.one_way_cost_pct(
+                              strat.position_usd, s.get("liquidity_usd")), 3)}
             if res.passed:
-                ledger.record_signal(db, strat.name, s, now, "pending")
+                ledger.record_signal(db, strat.name, s, now, "pending", details=cost_check)
                 counts["pending"] += 1
                 log.append(f"SIGNAL {strat.name} {s.get('symbol')} price {s.get('price_usd')}")
             else:
-                ledger.record_signal(db, strat.name, s, now, "rejected_safety", "; ".join(res.reasons)[:500])
+                ledger.record_signal(db, strat.name, s, now, "rejected_safety", "; ".join(res.reasons)[:500],
+                                     details=cost_check)
                 counts["rejected_safety"] += 1
         sig_stats[strat.name] = counts
         db.commit()

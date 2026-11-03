@@ -62,3 +62,19 @@ def test_parse_geckoterminal_pool():
     assert p["token_mint"] == "MINT123" and p["symbol"] == "DOGE2" and p["dex"] == "pumpswap"
     assert p["liquidity_usd"] == 65432.1 and p["chg_h1"] == -3.0 and p["txns_h24"] == 1600
     assert parse_pool({"attributes": {}}) is None
+
+
+def test_dexscreener_list_parsing(monkeypatch):
+    from desk.sources import dexscreener, http
+    monkeypatch.setattr(http, "get_json", lambda *a, **k: [
+        {"chainId": "solana", "tokenAddress": "A"}, {"chainId": "base", "tokenAddress": "B"},
+        {"chainId": "solana", "tokenAddress": "A"}, {"chainId": "solana"}])
+    assert dexscreener.solana_tokens("/x") == ["A"]
+
+
+def test_top_pool_addresses(monkeypatch):
+    from desk.sources import geckoterminal, http
+    monkeypatch.setattr(http, "get_json", lambda *a, **k: {"data": [
+        {"attributes": {"address": "MINT1"}, "relationships": {"top_pools": {"data": [{"id": "solana_POOL1"}]}}},
+        {"attributes": {"address": "MINT2"}, "relationships": {"top_pools": {"data": []}}}]})
+    assert geckoterminal.top_pool_addresses(["MINT1", "MINT2"]) == {"MINT1": "POOL1"}

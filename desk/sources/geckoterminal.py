@@ -87,6 +87,26 @@ def pools_multi(addresses: list[str]) -> list[dict]:
     return out
 
 
+def top_pool_addresses(mints: list[str]) -> dict[str, str]:
+    """{mint: its top pool address} for up to 30 mints per call."""
+    out = {}
+    for i in range(0, len(mints), 30):
+        chunk = mints[i:i + 30]
+        data = http.get_json(f"{config.GECKO_BASE}/networks/{NET}/tokens/multi/{','.join(chunk)}",
+                             params={"include": "top_pools"})
+        for tok in (data or {}).get("data") or []:
+            mint = ((tok.get("attributes") or {}).get("address"))
+            pools = (((tok.get("relationships") or {}).get("top_pools") or {}).get("data")) or []
+            if mint and pools:
+                pid = pools[0].get("id", "")
+                out[mint] = pid.split("_", 1)[1] if "_" in pid else pid
+    return out
+
+
+def trending_pools_5m(page: int) -> list[dict]:
+    return _pools(f"/networks/{NET}/trending_pools", {"page": page, "duration": "5m"})
+
+
 def token_pools(mint: str) -> list[dict]:
     return _pools(f"/networks/{NET}/tokens/{mint}/pools", {"page": 1})
 

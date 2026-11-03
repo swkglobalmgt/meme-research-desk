@@ -24,6 +24,9 @@ def test_full_cycle(monkeypatch, tmp_path):
     young = pool("P_YOUNG", "YOUNG", pool_created_at=datetime.now(timezone.utc).isoformat())
     monkeypatch.setattr(gt, "new_pools", lambda page: [safe, scam, young] if page == 1 else [])
     monkeypatch.setattr(gt, "trending_pools", lambda page: [])
+    monkeypatch.setattr(gt, "trending_pools_5m", lambda page: [])
+    from desk.sources import dexscreener
+    monkeypatch.setattr(dexscreener, "solana_tokens", lambda path: [])
     monkeypatch.setattr(gt, "token_pools", lambda mint: [])
     monkeypatch.setattr(gt, "pools_multi", lambda addrs: [])
     monkeypatch.setattr(gt, "minute_candles", lambda p: [])

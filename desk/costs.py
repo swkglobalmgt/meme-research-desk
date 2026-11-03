@@ -28,22 +28,37 @@ def slippage_pct(trade_usd: float, liquidity_usd: float | None, c: Costs = COSTS
     return min(100.0, c.base_slippage_pct + amm_impact_pct(trade_usd, liquidity_usd))
 
 
-def buy(size_usd: float, price: float, liquidity_usd: float | None, c: Costs = COSTS) -> dict:
+def one_way_cost_pct(trade_usd: float, liquidity_usd: float | None, c: Costs = COSTS) -> float:
+    """What our model charges for one swap: pool fee + slippage."""
+    return c.swap_fee_pct + slippage_pct(trade_usd, liquidity_usd, c)
+
+
+def quote_extra_pct(quoted_cost_pct: float | None, trade_usd: float, liquidity_usd: float | None,
+                    c: Costs = COSTS) -> float:
+    """If a real Jupiter quote showed a WORSE cost than our model, the gap (else 0)."""
+    if quoted_cost_pct is None:
+        return 0.0
+    return max(0.0, quoted_cost_pct - one_way_cost_pct(trade_usd, liquidity_usd, c))
+
+
+def buy(size_usd: float, price: float, liquidity_usd: float | None, c: Costs = COSTS,
+        extra_slippage_pct: float = 0.0) -> dict:
     """Simulate a market buy. Returns tokens received and the effective price paid."""
     if price <= 0:
         raise ValueError("price must be positive")
-    slip = slippage_pct(size_usd, liquidity_usd, c)
+    slip = min(100.0, slippage_pct(size_usd, liquidity_usd, c) + extra_slippage_pct)
     after_fee = size_usd * (1 - c.swap_fee_pct / 100.0)
     fill_price = price * (1 + slip / 100.0)
     return {"tokens": after_fee / fill_price, "fill_price": fill_price, "slippage_pct": slip}
 
 
-def sell(tokens: float, price: float, liquidity_usd: float | None, c: Costs = COSTS) -> dict:
+def sell(tokens: float, price: float, liquidity_usd: float | None, c: Costs = COSTS,
+         extra_slippage_pct: float = 0.0) -> dict:
     """Simulate a market sell. If liquidity is gone, proceeds are zero (unsellable)."""
     if liquidity_usd is None or liquidity_usd < c.rug_liquidity_usd or price <= 0:
         return {"proceeds_usd": 0.0, "fill_price": 0.0, "slippage_pct": 100.0, "sellable": False}
     gross = tokens * price
-    slip = slippage_pct(gross, liquidity_usd, c)
+    slip = min(100.0, slippage_pct(gross, liquidity_usd, c) + extra_slippage_pct)
     fill_price = price * (1 - slip / 100.0)
     proceeds = tokens * fill_price * (1 - c.swap_fee_pct / 100.0)
     return {"proceeds_usd": proceeds, "fill_price": fill_price, "slippage_pct": slip, "sellable": True}

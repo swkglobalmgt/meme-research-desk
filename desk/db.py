@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS positions (
     take_profit_price REAL, stop_loss_price REAL, max_hold_until TEXT, last_candle_ts INTEGER,
     exit_ts TEXT, exit_price REAL, exit_liquidity REAL, exit_slippage_pct REAL, exit_reason TEXT,
     is_rug INTEGER DEFAULT 0, proceeds_usd REAL, fixed_costs_usd REAL, net_pnl_usd REAL, net_return REAL,
-    leader TEXT
+    leader TEXT, cost_adj_pct REAL
 );
 CREATE TABLE IF NOT EXISTS leaders (
     wallet TEXT PRIMARY KEY, source TEXT, selected_at TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
@@ -106,6 +106,15 @@ class DB:
             if stmt.strip():
                 self.execute(stmt)
         self.commit()
+        self._add_column("positions", "cost_adj_pct", "REAL")
+        self.commit()
+
+    def _add_column(self, table: str, col: str, typ: str) -> None:
+        """Add a column to a table created by an older version."""
+        if self.kind == "pg":
+            self.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {typ}")
+        elif col not in [r[1] for r in self.conn.execute(f"PRAGMA table_info({table})").fetchall()]:
+            self.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
 
     def execute(self, sql: str, params: tuple | list = ()):
         cur = self.conn.cursor()

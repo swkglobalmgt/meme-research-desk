@@ -10,8 +10,9 @@ transaction, and it refuses to run if a private key is present in its environmen
 
 Every 30 minutes GitHub runs one research cycle:
 
-1. **Collect.** It pulls newly created and trending Solana pools from GeckoTerminal
-   and keeps a watch list of young pools that have real liquidity.
+1. **Collect.** It pulls newly created and trending Solana pools from GeckoTerminal, plus
+   DexScreener's newest token profiles and promoted ("boosted") tokens, and keeps a watch
+   list of young pools that have real liquidity.
 2. **Look for entries.** It checks four strategies, each kept completely separate:
    | Strategy | Buys when… |
    |---|---|
@@ -58,6 +59,10 @@ Needs the `DUNE_API_KEY` secret (free account at dune.com).
 - If liquidity falls 80%+ or the pool disappears, the trade is a **rug**. Below $1k liquidity
   the tokens are worth **zero**.
 - Every filled trade stays in the results, rugs included.
+
+**Cost check:** every signal also gets a real Jupiter sell quote at our size. If the real cost is
+worse than our model, that trade is charged the real cost on the way in and out. The report shows how
+often this happens.
 
 With no price movement at all, a round trip on a $50k pool costs about 6%.
 A strategy has to beat that just to break even.
