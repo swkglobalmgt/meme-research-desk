@@ -182,3 +182,12 @@ def test_rug_that_gaps_straight_down_exits_at_gap(db):
     ledger.manage_open(db, NOW, lambda p: candles, lambda p: {"liquidity_usd": 10_000, "price_usd": 0.02}, [])
     pos = db.one("SELECT * FROM positions")
     assert pos["exit_price"] == pytest.approx(0.05) and pos["is_rug"] == 1
+
+
+def test_connection_error_detection():
+    from desk.db import _is_connection_error
+
+    class IdleInTransactionSessionTimeout(Exception):
+        pass
+    assert _is_connection_error(IdleInTransactionSessionTimeout("terminating connection"))
+    assert not _is_connection_error(ValueError("bad value"))

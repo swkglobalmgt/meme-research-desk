@@ -63,6 +63,12 @@ CREATE INDEX IF NOT EXISTS positions_strategy ON positions(strategy, status);
 """
 
 
+def _is_connection_error(e: Exception) -> bool:
+    name = type(e).__name__
+    return name in ("OperationalError", "InterfaceError", "IdleInTransactionSessionTimeout",
+                    "AdminShutdown", "ConnectionTimeout") or "connection" in str(e).lower()
+
+
 NO_ID_TABLES = {"pools", "leaders", "leader_trades"}
 
 
@@ -87,14 +93,19 @@ class DB:
         url = url or os.environ.get("DATABASE_URL") or "sqlite:///desk.sqlite3"
         self.url = url
         if url.startswith(("postgres://", "postgresql://")):
-            import psycopg  # only needed in production
             self.kind = "pg"
-            self.conn = psycopg.connect(url, autocommit=False)
+            self._connect_pg()
         else:
             self.kind = "sqlite"
             path = url.replace("sqlite:///", "", 1) if url.startswith("sqlite:///") else url
             self.conn = sqlite3.connect(path)
             self.conn.row_factory = sqlite3.Row
+
+    def _connect_pg(self) -> None:
+        # Autocommit: every write is saved at once. Runs spend minutes calling outside
+        # APIs between writes, and Neon closes connections left idle inside a transaction.
+        import psycopg  # only needed in production
+        self.conn = psycopg.connect(self.url, autocommit=True, connect_timeout=30)
 
     # -- helpers -----------------------------------------------------------
     def _sql(self, sql: str) -> str:
@@ -117,9 +128,17 @@ class DB:
             self.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
 
     def execute(self, sql: str, params: tuple | list = ()):
-        cur = self.conn.cursor()
-        cur.execute(self._sql(sql), tuple(params))
-        return cur
+        try:
+            cur = self.conn.cursor()
+            cur.execute(self._sql(sql), tuple(params))
+            return cur
+        except Exception as e:
+            if self.kind != "pg" or not _is_connection_error(e):
+                raise
+            self._connect_pg()  # Neon dropped us (idle timeout / compute suspended): reconnect once
+            cur = self.conn.cursor()
+            cur.execute(self._sql(sql), tuple(params))
+            return cur
 
     def insert(self, table: str, row: dict) -> int:
         cols = ", ".join(row)
@@ -156,13 +175,18 @@ class DB:
         return True
 
     def commit(self) -> None:
-        self.conn.commit()
+        if self.kind != "pg":
+            self.conn.commit()
 
     def rollback(self) -> None:
-        self.conn.rollback()
+        if self.kind != "pg":
+            self.conn.rollback()
 
     def close(self) -> None:
-        self.conn.close()
+        try:
+            self.conn.close()
+        except Exception:
+            pass
 
 
 @contextmanager
