@@ -127,7 +127,8 @@ def check_safety(db: DB, snap: dict, now: datetime, position_usd: float,
     facts = None
     if cached:
         facts = json.loads(cached["details"]) if isinstance(cached["details"], str) else cached["details"]
-        if facts.get("mint_error") or facts.get("rugcheck_error") or facts.get("sell_quote_error"):
+        if facts.get("mint_error") or facts.get("rugcheck_error") or facts.get("sell_quote_error") \
+                or not facts.get("sell_quote_found"):
             facts = None  # never cache a source outage; try again
     if facts:
         facts.update({"liquidity_usd": snap.get("liquidity_usd"), "age_hours": age,

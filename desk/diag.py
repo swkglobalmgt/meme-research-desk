@@ -27,6 +27,15 @@ def main():
             show(f"jupiter {url}", s.get(url, params=params, timeout=20))
         except Exception as e:
             print(f"--- jupiter {url}: ERROR {e}\n")
+    from .sources import onchain
+    try:
+        print("--- fixed sell quote BONK 10k tokens:", onchain.jupiter_sell_quote(BONK, 5, 1_000_000))
+    except Exception as e:
+        print(f"--- fixed sell quote: ERROR {e}")
+    try:
+        print("--- SOL price:", onchain.sol_usd_price())
+    except Exception as e:
+        print(f"--- SOL price: ERROR {e}")
     try:
         show("rugcheck BONK", s.get(f"{config.RUGCHECK_BASE}/tokens/{BONK}/report/summary", timeout=30))
     except Exception as e:

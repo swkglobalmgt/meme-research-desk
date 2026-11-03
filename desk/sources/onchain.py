@@ -40,19 +40,47 @@ def rugcheck_report(mint: str) -> dict | None:
     return http.get_json(f"{config.RUGCHECK_BASE}/tokens/{mint}/report", timeout=30)
 
 
+WSOL = "So11111111111111111111111111111111111111112"
+_sol_price: dict = {}
+
+
+class NoRoute(Exception):
+    pass
+
+
+def sol_usd_price() -> float:
+    """SOL price in USD from GeckoTerminal (cached per run)."""
+    if "p" not in _sol_price:
+        data = http.get_json(f"{config.GECKO_BASE}/simple/networks/solana/token_price/{WSOL}")
+        prices = (((data or {}).get("data") or {}).get("attributes") or {}).get("token_prices") or {}
+        p = float(prices.get(WSOL) or 0)
+        if p <= 0:
+            raise http.FetchError("no SOL price")
+        _sol_price["p"] = p
+    return _sol_price["p"]
+
+
 def jupiter_sell_quote(mint: str, decimals: int, token_amount: float) -> dict | None:
-    """Quote selling `token_amount` tokens for USDC. Returns {'out_usd': float} or None if no route."""
+    """Quote selling `token_amount` tokens for SOL, valued in USD.
+
+    Returns {'out_usd': float} or None if Jupiter says no route exists.
+    Raises on any other failure, so an outage is never mistaken for a honeypot.
+    (Jupiter stopped quoting into USDC in late 2026, hence SOL.)
+    """
     raw = int(token_amount * (10 ** decimals))
     if raw <= 0:
         return None
     try:
         q = http.get_json(config.JUPITER_QUOTE, params={
-            "inputMint": mint, "outputMint": config.USDC_MINT, "amount": raw, "slippageBps": 500,
+            "inputMint": mint, "outputMint": WSOL, "amount": raw, "slippageBps": 500,
         })
     except http.FetchError as e:
-        if "400" in str(e):  # Jupiter answers 400 when no route exists
+        msg = str(e)
+        if "400" in msg and ("NO_ROUTE" in msg.upper() or "COULD_NOT_FIND" in msg.upper()
+                             or (mint in msg and "not tradable" in msg)):
             return None
         raise
     if not q or "outAmount" not in q:
         return None
-    return {"out_usd": int(q["outAmount"]) / 1e6, "route_count": len(q.get("routePlan") or [])}
+    out_sol = int(q["outAmount"]) / 1e9
+    return {"out_usd": out_sol * sol_usd_price(), "route_count": len(q.get("routePlan") or [])}
