@@ -2,7 +2,7 @@ name: research-cycle
 
 on:
   schedule:
-    - cron: "4,34 * * * *"     # every 30 minutes
+    - cron: "4,19,34,49 * * * *"   # asked every 15 min; GitHub often delays/skips, so ~every 30 min in practice
   workflow_dispatch: {}
   push:
     branches: [main]

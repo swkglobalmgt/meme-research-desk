@@ -178,7 +178,7 @@ ROWS = [("Completed trades", lambda s: str(s["trades"])), ("Open positions", lam
         ("Average loss", lambda s: _money(s["avg_loss_usd"])),
         ("Net P&L after all costs", lambda s: _money(s["net_pnl_usd"])),
         ("Average return per trade", lambda s: _pct(s["mean_return"])),
-        ("t-stat (need ≥ 2)", lambda s: _t(s["t_stat"])),
+        ("t-stat (need ≥ 2; shown from 10 trades)", lambda s: _t(s["t_stat"]) if s["trades"] >= 10 else "–"),
         ("Worst drawdown", lambda s: _money(-s["max_drawdown_usd"]) if s["max_drawdown_usd"] else "$0.00"),
         ("Rugs / unsellable hit", lambda s: str(s["rugs"])),
         ("Losses worse than -50%", lambda s: str(s["big_losses"])),
