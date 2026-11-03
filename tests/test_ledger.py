@@ -169,7 +169,7 @@ def test_rug_still_gets_stop_loss_chance_but_counts_as_rug(db):
                c(T0 + 120, 0.9, 0.9, 0.7, 0.75),     # stop 0.8 hit on the way down
                c(T0 + 180, 0.1, 0.1, 0.02, 0.03)]    # the rug
     ledger.fill_pending(db, NOW, lambda p: candles, [])
-    ledger.manage_open(db, NOW, lambda p: candles, lambda p: {"liquidity_usd": 50_000, "price_usd": 0.03}, [])
+    ledger.manage_open(db, NOW, lambda p: candles, lambda p: {"liquidity_usd": 10_000, "price_usd": 0.03}, [])
     pos = db.one("SELECT * FROM positions")
     assert pos["exit_reason"] == "stop_loss" and pos["exit_price"] == pytest.approx(0.8)
     assert pos["is_rug"] == 1
@@ -179,6 +179,6 @@ def test_rug_that_gaps_straight_down_exits_at_gap(db):
     _signal(db)
     candles = [c(T0 + 60, 1.0, 1.0, 1.0, 1.0), c(T0 + 120, 0.05, 0.05, 0.01, 0.02)]
     ledger.fill_pending(db, NOW, lambda p: candles, [])
-    ledger.manage_open(db, NOW, lambda p: candles, lambda p: {"liquidity_usd": 50_000, "price_usd": 0.02}, [])
+    ledger.manage_open(db, NOW, lambda p: candles, lambda p: {"liquidity_usd": 10_000, "price_usd": 0.02}, [])
     pos = db.one("SELECT * FROM positions")
     assert pos["exit_price"] == pytest.approx(0.05) and pos["is_rug"] == 1
