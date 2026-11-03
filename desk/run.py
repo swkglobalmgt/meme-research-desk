@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 import json
 import os
 import sys
@@ -26,7 +27,17 @@ def _assert_paper() -> None:
 
 def cycle(db, log: list) -> dict:
     now = utcnow()
-    stats = {"collect": collector.collect(db, now, log)}
+    clock = time.monotonic()
+    timings = {}
+
+    def lap(name):
+        nonlocal clock
+        t = time.monotonic()
+        timings[name] = round(t - clock, 1)
+        clock = t
+
+    stats = {"collect": collector.collect(db, now, log), "seconds": timings}
+    lap("collect")
     db.commit()
 
     candle_cache: dict[str, list] = {}
@@ -40,6 +51,7 @@ def cycle(db, log: list) -> dict:
     ledger.manage_open(db, now, candles, lambda p: collector.latest_snapshot(db, p), log,
                        leader_exit=lambda pos: copytrade.leader_exit_epoch(db, pos))
     db.commit()
+    lap("fills_and_exits")
 
     # Copy-trading: re-screen fomo traders weekly, then look for their new trades.
     try:
@@ -49,6 +61,7 @@ def cycle(db, log: list) -> dict:
         stats["copy_trader"] = {"status": f"error: {e}"}
         log.append(f"copy_trader error: {e}")
     db.commit()
+    lap("copy_trader")
 
     # New signals from this run's snapshots.
     snaps = collector.latest_snapshots(db, now - timedelta(minutes=5))
@@ -78,6 +91,7 @@ def cycle(db, log: list) -> dict:
         sig_stats[strat.name] = counts
         db.commit()
     stats["signals"] = sig_stats
+    lap("signals_and_safety")
 
     # Hand-picked tokens: always run the safety check so the founder sees the verdict.
     watch = {}
@@ -91,6 +105,7 @@ def cycle(db, log: list) -> dict:
                        "liquidity_usd": snap.get("liquidity_usd"), "chg_h24": snap.get("chg_h24")}
     stats["watch_tokens"] = watch
     db.commit()
+    lap("watch_tokens")
     return stats
 
 

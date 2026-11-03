@@ -22,19 +22,41 @@ def age_hours(pool_created_at: str | None, now: datetime) -> float | None:
 
 
 def _store(db: DB, p: dict, now: datetime, source: str, stats: dict) -> None:
-    if db.upsert_pool({
-        "pool_address": p["pool_address"], "token_mint": p["token_mint"], "name": p.get("name"),
-        "symbol": p.get("symbol"), "dex": p.get("dex"), "pool_created_at": p.get("pool_created_at"),
-        "first_seen_at": iso(now), "source": source,
-    }):
-        stats["new_pools"] += 1
-    db.update("pools", "pool_address", p["pool_address"],
-              {"last_snapshot_at": iso(now), "missing_count": 0})
-    # Keep storage small: only snapshot pools with real liquidity (or ones we hold).
-    if (p.get("liquidity_usd") or 0) >= config.WATCH_MIN_LIQ_USD or source == "held":
-        db.insert("snapshots", {"pool_address": p["pool_address"], "ts": iso(now),
-                                **{k: p.get(k) for k in SNAP_COLS}})
-        stats["snapshots"] += 1
+    """Store one pool (used outside the main batch, e.g. copy-trading lookups)."""
+    _store_many(db, [(p, source)], now, stats)
+
+
+def _store_many(db: DB, items: list[tuple[dict, str]], now: datetime, stats: dict) -> None:
+    """Store many pools in a few batched queries (Neon round-trips are slow)."""
+    if not items:
+        return
+    t = iso(now)
+    addrs = [p["pool_address"] for p, _ in items]
+    existing = set()
+    for i in range(0, len(addrs), 500):
+        chunk = addrs[i:i + 500]
+        qs = ",".join("?" for _ in chunk)
+        existing |= {r["pool_address"] for r in db.all(
+            f"SELECT pool_address FROM pools WHERE pool_address IN ({qs})", chunk)}
+    new_rows, upd_rows, snap_rows = [], [], []
+    for p, source in items:
+        a = p["pool_address"]
+        if a not in existing:
+            existing.add(a)
+            new_rows.append((a, p["token_mint"], p.get("name"), p.get("symbol"), p.get("dex"),
+                             p.get("pool_created_at"), t, t, source))
+        else:
+            upd_rows.append((t, a))
+        # Keep storage small: only snapshot pools with real liquidity (or ones we hold).
+        if (p.get("liquidity_usd") or 0) >= config.WATCH_MIN_LIQ_USD or source == "held":
+            snap_rows.append((a, t, *[p.get(k) for k in SNAP_COLS]))
+    db.executemany("INSERT INTO pools (pool_address, token_mint, name, symbol, dex, pool_created_at, "
+                   "first_seen_at, last_snapshot_at, source) VALUES (?,?,?,?,?,?,?,?,?)", new_rows)
+    db.executemany("UPDATE pools SET last_snapshot_at = ?, missing_count = 0 WHERE pool_address = ?", upd_rows)
+    db.executemany(f"INSERT INTO snapshots (pool_address, ts, {', '.join(SNAP_COLS)}) "
+                   f"VALUES ({','.join('?' for _ in range(2 + len(SNAP_COLS)))})", snap_rows)
+    stats["new_pools"] = stats.get("new_pools", 0) + len(new_rows)
+    stats["snapshots"] = stats.get("snapshots", 0) + len(snap_rows)
 
 
 def collect(db: DB, now: datetime, log: list) -> dict:
@@ -79,8 +101,7 @@ def collect(db: DB, now: datetime, log: list) -> dict:
             best = max(pools, key=lambda x: x.get("liquidity_usd") or 0)
             seen[best["pool_address"]] = (best, "watch_token")
 
-    for p, src in seen.values():
-        _store(db, p, now, src, stats)
+    _store_many(db, list(seen.values()), now, stats)
 
     # Refresh the watch list: young pools with liquidity, plus anything we hold.
     held = {r["pool_address"] for r in db.all(
@@ -90,14 +111,14 @@ def collect(db: DB, now: datetime, log: list) -> dict:
              if r["pool_address"] not in seen]
     watch = list(dict.fromkeys(watch + [h for h in held if h not in seen]))
     refreshed = {p["pool_address"]: p for p in grab(gt.pools_multi, watch, label="pools_multi")}
-    for addr in watch:
-        if addr in refreshed:
-            _store(db, refreshed[addr], now, "held" if addr in held else "watch", stats)
-        elif refreshed or not watch:  # only count as missing if the call itself worked
-            db.execute("UPDATE pools SET missing_count = missing_count + 1 WHERE pool_address = ?", [addr])
+    _store_many(db, [(refreshed[a], "held" if a in held else "watch") for a in watch if a in refreshed], now, stats)
+    if refreshed:  # only count as missing if the call itself worked
+        db.executemany("UPDATE pools SET missing_count = missing_count + 1 WHERE pool_address = ?",
+                       [(a,) for a in watch if a not in refreshed])
 
     # Retire pools that are too old or too thin (never ones we hold, never hand-picked).
     retired = 0
+    to_retire = []
     for r in db.all("SELECT pool_address, pool_created_at, source FROM pools WHERE active = 1"):
         if r["pool_address"] in held or r["source"] == "watch_token":
             continue
@@ -106,8 +127,9 @@ def collect(db: DB, now: datetime, log: list) -> dict:
         liq = (latest or {}).get("liquidity_usd")
         if (age is not None and age > config.WATCH_MAX_AGE_HOURS) or \
            (age is not None and age >= 1 and (liq or 0) < config.WATCH_MIN_LIQ_USD):
-            db.update("pools", "pool_address", r["pool_address"], {"active": 0})
+            to_retire.append((r["pool_address"],))
             retired += 1
+    db.executemany("UPDATE pools SET active = 0 WHERE pool_address = ?", to_retire)
     stats["retired"] = retired
     stats["watching"] = db.one("SELECT COUNT(*) AS n FROM pools WHERE active = 1")["n"]
 

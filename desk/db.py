@@ -140,6 +140,17 @@ class DB:
             cur.execute(self._sql(sql), tuple(params))
             return cur
 
+    def executemany(self, sql: str, rows: list) -> None:
+        if not rows:
+            return
+        try:
+            self.conn.cursor().executemany(self._sql(sql), rows)
+        except Exception as e:
+            if self.kind != "pg" or not _is_connection_error(e):
+                raise
+            self._connect_pg()
+            self.conn.cursor().executemany(self._sql(sql), rows)
+
     def insert(self, table: str, row: dict) -> int:
         cols = ", ".join(row)
         qs = ", ".join("?" for _ in row)
