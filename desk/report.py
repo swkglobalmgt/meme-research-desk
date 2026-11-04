@@ -68,7 +68,9 @@ def gate_verdict(s: dict, weeks: float, g: Gate = GATE) -> tuple[bool, list[str]
     if s["net_pnl_usd"] <= 0:
         fails.append(f"net P&L after costs is ${s['net_pnl_usd']:,.2f} (not positive)")
     t = s["t_stat"]
-    if t is None or t < g.min_t_stat:
+    if s["trades"] < 10:
+        fails.append("too few trades for a meaningful t-stat")
+    elif t is None or t < g.min_t_stat:
         fails.append(f"t-stat {'n/a' if t is None else f'{t:.2f}'} below {g.min_t_stat}")
     return (not fails), fails
 
