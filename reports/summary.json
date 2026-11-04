@@ -1,120 +1,123 @@
 {
-  "generated_at": "2026-11-03T14:22+00:00",
+  "generated_at": "2026-11-04T14:25+00:00",
   "strategies": {
     "momentum": {
-      "trades": 9,
-      "win_rate": 0.4444444444444444,
-      "avg_win_usd": 18.058206875,
-      "avg_loss_usd": -37.8460576,
-      "net_pnl_usd": -116.9974605,
-      "mean_return": -0.12999717333333333,
-      "t_stat": -1.013803816188141,
-      "max_drawdown_usd": 146.37144500000002,
-      "rugs": 2,
+      "trades": 17,
+      "win_rate": 0.35294117647058826,
+      "avg_win_usd": 19.56579175,
+      "avg_loss_usd": -29.3816073,
+      "net_pnl_usd": -205.80292980000002,
+      "mean_return": -0.12106054188235295,
+      "t_stat": -1.608851986269147,
+      "max_drawdown_usd": 205.80292980000002,
+      "rugs": 3,
       "big_losses": 1,
       "exit_reasons": {
         "rug": 1,
-        "stop_loss": 3,
-        "take_profit": 4,
-        "max_hold": 1
+        "stop_loss": 8,
+        "take_profit": 6,
+        "max_hold": 2
       },
-      "open": 1,
+      "open": 0,
       "signals": {
-        "filled": 10,
-        "rejected_safety": 208
+        "filled": 17,
+        "rejected_safety": 450
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 0.0 of 4 weeks of data",
-        "only 9 of 100 completed trades",
-        "net P&L after costs is $-117.00 (not positive)",
-        "t-stat -1.01 below 2.0"
+        "only 0.1 of 4 weeks of data",
+        "only 17 of 100 completed trades",
+        "net P&L after costs is $-205.80 (not positive)",
+        "t-stat -1.61 below 2.0"
       ],
       "description": "Safe token already rising: +20% or more over 1h, still up over 5m, more buys than sells."
     },
     "volume_breakout": {
-      "trades": 1,
-      "win_rate": 0.0,
-      "avg_win_usd": null,
-      "avg_loss_usd": -30.615124,
-      "net_pnl_usd": -30.615124,
-      "mean_return": -0.30615124,
-      "t_stat": null,
+      "trades": 3,
+      "win_rate": 0.3333333333333333,
+      "avg_win_usd": 23.001936,
+      "avg_loss_usd": -23.8561185,
+      "net_pnl_usd": -24.710301,
+      "mean_return": -0.08236766999999999,
+      "t_stat": -0.5116180083828252,
       "max_drawdown_usd": 30.615124,
       "rugs": 0,
       "big_losses": 0,
       "exit_reasons": {
-        "stop_loss": 1
-      },
-      "open": 1,
-      "signals": {
-        "filled": 2,
-        "rejected_safety": 123
-      },
-      "gate_pass": false,
-      "gate_fails": [
-        "only 0.0 of 4 weeks of data",
-        "only 1 of 100 completed trades",
-        "net P&L after costs is $-30.62 (not positive)",
-        "t-stat n/a below 2.0"
-      ],
-      "description": "Last 5 minutes traded 3x+ the hour's average pace and price is up 3%+ in those 5 minutes."
-    },
-    "pullback": {
-      "trades": 3,
-      "win_rate": 0.0,
-      "avg_win_usd": null,
-      "avg_loss_usd": -27.37333,
-      "net_pnl_usd": -82.11999,
-      "mean_return": -0.27373330333333334,
-      "t_stat": -20.692293641005886,
-      "max_drawdown_usd": 82.11999,
-      "rugs": 0,
-      "big_losses": 0,
-      "exit_reasons": {
-        "stop_loss": 2,
+        "stop_loss": 1,
+        "take_profit": 1,
         "max_hold": 1
       },
       "open": 0,
       "signals": {
         "filled": 3,
-        "rejected_safety": 2
+        "rejected_safety": 278
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 0.0 of 4 weeks of data",
+        "only 0.1 of 4 weeks of data",
         "only 3 of 100 completed trades",
-        "net P&L after costs is $-82.12 (not positive)",
-        "t-stat -20.69 below 2.0"
+        "net P&L after costs is $-24.71 (not positive)",
+        "too few trades for a meaningful t-stat"
+      ],
+      "description": "Last 5 minutes traded 3x+ the hour's average pace and price is up 3%+ in those 5 minutes."
+    },
+    "pullback": {
+      "trades": 9,
+      "win_rate": 0.1111111111111111,
+      "avg_win_usd": 22.490778,
+      "avg_loss_usd": -26.508115375,
+      "net_pnl_usd": -189.574145,
+      "mean_return": -0.21063794333333333,
+      "t_stat": -3.8312020264998243,
+      "max_drawdown_usd": 189.574145,
+      "rugs": 0,
+      "big_losses": 0,
+      "exit_reasons": {
+        "stop_loss": 7,
+        "max_hold": 1,
+        "take_profit": 1
+      },
+      "open": 0,
+      "signals": {
+        "filled": 9,
+        "rejected_safety": 14
+      },
+      "gate_pass": false,
+      "gate_fails": [
+        "only 0.1 of 4 weeks of data",
+        "only 9 of 100 completed trades",
+        "net P&L after costs is $-189.57 (not positive)",
+        "too few trades for a meaningful t-stat"
       ],
       "description": "Up 50%+ over 6h, then pulled back 10-25% over the last hour, now bouncing over 5m."
     },
     "founder_screen": {
-      "trades": 7,
-      "win_rate": 0.2857142857142857,
+      "trades": 8,
+      "win_rate": 0.25,
       "avg_win_usd": 23.1300265,
-      "avg_loss_usd": -27.2955804,
-      "net_pnl_usd": -90.217849,
-      "mean_return": -0.12888263714285714,
-      "t_stat": -1.3760592179935272,
-      "max_drawdown_usd": 90.21784900000002,
+      "avg_loss_usd": -27.983015166666664,
+      "net_pnl_usd": -121.638038,
+      "mean_return": -0.152047545,
+      "t_stat": -1.8024610013706812,
+      "max_drawdown_usd": 121.63803800000002,
       "rugs": 2,
       "big_losses": 0,
       "exit_reasons": {
-        "stop_loss": 5,
+        "stop_loss": 6,
         "take_profit": 2
       },
-      "open": 0,
+      "open": 1,
       "signals": {
-        "filled": 7,
-        "rejected_safety": 59
+        "filled": 9,
+        "rejected_safety": 159
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 0.0 of 4 weeks of data",
-        "only 7 of 100 completed trades",
-        "net P&L after costs is $-90.22 (not positive)",
-        "t-stat -1.38 below 2.0"
+        "only 0.1 of 4 weeks of data",
+        "only 8 of 100 completed trades",
+        "net P&L after costs is $-121.64 (not positive)",
+        "too few trades for a meaningful t-stat"
       ],
       "description": "Founder's DexScreener screen: top 24h gainers with liq >= $25k, 24h txns >= 50, 24h volume >= $10k (safety filters still require $50k liq). Buys the top-ranked names."
     },
@@ -134,64 +137,76 @@
       "signals": {},
       "gate_pass": false,
       "gate_fails": [
-        "only 0.0 of 4 weeks of data",
+        "only 0.1 of 4 weeks of data",
         "only 0 of 100 completed trades",
         "net P&L after costs is $0.00 (not positive)",
-        "t-stat n/a below 2.0"
+        "too few trades for a meaningful t-stat"
       ],
       "description": "Paper-copy fomo traders chosen for consistent REALIZED profit (from public on-chain data). Buy 60s+ after they buy (safety filters still apply); sell when they sell, or at our stop/target/max hold."
     }
   },
-  "weeks_of_data": 0.0,
+  "weeks_of_data": 0.14285714285714285,
   "funnel": {
-    "pools_seen": 3027,
-    "pools_watching": 239,
-    "snapshots": 2456,
-    "safety_checks": 276,
-    "safety_passed": 18
+    "pools_seen": 7481,
+    "pools_watching": 409,
+    "snapshots": 9208,
+    "safety_checks": 642,
+    "safety_passed": 30
   },
   "copy": {
     "leaders": [],
     "last_screen": null
   },
   "cost_check": {
-    "n": 306,
-    "median_quoted": -0.2625,
-    "median_model": 3.0244999999999997,
-    "share_worse": 0.39869281045751637,
-    "trades_bumped": 5
+    "n": 729,
+    "median_quoted": 1.325,
+    "median_model": 3.061,
+    "share_worse": 0.45953360768175583,
+    "trades_bumped": 10
   },
   "safety_fail_reasons": [
     [
       "too young (< 1h)",
-      247
-    ],
-    [
-      "LP not burned/locked (or unknown)",
-      188
+      497
     ],
     [
       "liquidity < $50k (or unknown)",
-      188
+      404
+    ],
+    [
+      "LP not burned/locked (or unknown)",
+      377
     ],
     [
       "top-10 holders >= 30%",
-      108
-    ],
-    [
-      "no sell route found",
-      69
+      301
     ],
     [
       "selling our size loses > 10%",
-      65
+      176
+    ],
+    [
+      "no sell route found",
+      171
     ],
     [
       "too few sells in last hour",
-      13
+      86
     ],
     [
       "mint authority NOT revoked",
+      3
+    ],
+    [
+      "sell tax 100 bps",
+      3
+    ],
+    [
+      "sell tax 500 bps",
+      1
+    ],
+    [
+      "sell tax 300 bps",
       1
     ]
   ]
