@@ -1,20 +1,20 @@
 {
-  "generated_at": "2026-11-18T21:26+00:00",
+  "generated_at": "2026-11-19T21:30+00:00",
   "strategies": {
     "momentum": {
-      "trades": 104,
-      "win_rate": 0.375,
+      "trades": 107,
+      "win_rate": 0.3644859813084112,
       "avg_win_usd": 19.856485347692306,
-      "avg_loss_usd": -26.87090215692308,
-      "net_pnl_usd": -972.20571164,
-      "mean_return": -0.09348131845192308,
-      "t_stat": -3.6978576767597127,
-      "max_drawdown_usd": 979.6647296399998,
+      "avg_loss_usd": -26.899338635294118,
+      "net_pnl_usd": -1054.75209864,
+      "mean_return": -0.0985749623271028,
+      "t_stat": -3.983196502778867,
+      "max_drawdown_usd": 1054.7520986399998,
       "rugs": 8,
       "big_losses": 2,
       "exit_reasons": {
         "rug": 1,
-        "stop_loss": 53,
+        "stop_loss": 56,
         "take_profit": 37,
         "max_hold": 12,
         "unsellable": 1
@@ -22,14 +22,14 @@
       "open": 0,
       "signals": {
         "pending": 1,
-        "filled": 104,
-        "rejected_safety": 2484
+        "filled": 107,
+        "rejected_safety": 2504
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 2.1 of 4 weeks of data",
-        "net P&L after costs is $-972.21 (not positive)",
-        "t-stat -3.70 below 2.0"
+        "only 2.3 of 4 weeks of data",
+        "net P&L after costs is $-1,054.75 (not positive)",
+        "t-stat -3.98 below 2.0"
       ],
       "description": "Safe token already rising: +20% or more over 1h, still up over 5m, more buys than sells."
     },
@@ -54,11 +54,11 @@
       "open": 0,
       "signals": {
         "filled": 31,
-        "rejected_safety": 1644
+        "rejected_safety": 1653
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 2.1 of 4 weeks of data",
+        "only 2.3 of 4 weeks of data",
         "only 31 of 100 completed trades",
         "net P&L after costs is $-435.53 (not positive)",
         "t-stat -2.54 below 2.0"
@@ -88,7 +88,7 @@
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 2.1 of 4 weeks of data",
+        "only 2.3 of 4 weeks of data",
         "only 35 of 100 completed trades",
         "net P&L after costs is $-168.40 (not positive)",
         "t-stat -1.24 below 2.0"
@@ -96,33 +96,33 @@
       "description": "Up 50%+ over 6h, then pulled back 10-25% over the last hour, now bouncing over 5m."
     },
     "founder_screen": {
-      "trades": 67,
-      "win_rate": 0.31343283582089554,
-      "avg_win_usd": 14.01604587761905,
-      "avg_loss_usd": -22.480794432608693,
-      "net_pnl_usd": -739.77958047,
-      "mean_return": -0.11041486332089552,
-      "t_stat": -4.619173118822434,
-      "max_drawdown_usd": 739.7795804699998,
+      "trades": 70,
+      "win_rate": 0.3142857142857143,
+      "avg_win_usd": 14.425461565,
+      "avg_loss_usd": -22.67611776875,
+      "net_pnl_usd": -771.09349847,
+      "mean_return": -0.11015621460714287,
+      "t_stat": -4.662730225073916,
+      "max_drawdown_usd": 771.0934984699999,
       "rugs": 9,
       "big_losses": 0,
       "exit_reasons": {
-        "stop_loss": 35,
-        "take_profit": 13,
+        "stop_loss": 37,
+        "take_profit": 14,
         "max_hold": 19
       },
       "open": 0,
       "signals": {
-        "pending": 2,
-        "filled": 67,
-        "rejected_safety": 779
+        "pending": 1,
+        "filled": 70,
+        "rejected_safety": 789
       },
       "gate_pass": false,
       "gate_fails": [
-        "only 2.1 of 4 weeks of data",
-        "only 67 of 100 completed trades",
-        "net P&L after costs is $-739.78 (not positive)",
-        "t-stat -4.62 below 2.0"
+        "only 2.3 of 4 weeks of data",
+        "only 70 of 100 completed trades",
+        "net P&L after costs is $-771.09 (not positive)",
+        "t-stat -4.66 below 2.0"
       ],
       "description": "Founder's DexScreener screen: top 24h gainers with liq >= $25k, 24h txns >= 50, 24h volume >= $10k (safety filters still require $50k liq). Buys the top-ranked names."
     },
@@ -142,7 +142,7 @@
       "signals": {},
       "gate_pass": false,
       "gate_fails": [
-        "only 2.1 of 4 weeks of data",
+        "only 2.3 of 4 weeks of data",
         "only 0 of 100 completed trades",
         "net P&L after costs is $0.00 (not positive)",
         "too few trades for a meaningful t-stat"
@@ -150,65 +150,65 @@
       "description": "Paper-copy fomo traders chosen for consistent REALIZED profit (from public on-chain data). Buy 60s+ after they buy (safety filters still apply); sell when they sell, or at our stop/target/max hold."
     }
   },
-  "weeks_of_data": 2.142857142857143,
+  "weeks_of_data": 2.2857142857142856,
   "funnel": {
-    "pools_seen": 42230,
-    "pools_watching": 192,
-    "snapshots": 102852,
-    "safety_checks": 3644,
-    "safety_passed": 178
+    "pools_seen": 42720,
+    "pools_watching": 204,
+    "snapshots": 103302,
+    "safety_checks": 3679,
+    "safety_passed": 182
   },
   "copy": {
     "leaders": [],
     "last_screen": null
   },
   "cost_check": {
-    "n": 4469,
+    "n": 4509,
     "median_quoted": 0.548,
-    "median_model": 3.033,
-    "share_worse": 0.4473036473484001,
-    "trades_bumped": 69
+    "median_model": 3.031,
+    "share_worse": 0.4457751164337991,
+    "trades_bumped": 71
   },
   "safety_fail_reasons": [
     [
       "too young (< 1h)",
-      2865
+      2887
     ],
     [
       "liquidity < $50k (or unknown)",
-      2394
+      2407
     ],
     [
       "LP not burned/locked (or unknown)",
-      2129
+      2146
     ],
     [
       "top-10 holders >= 30%",
-      1749
+      1762
     ],
     [
       "selling our size loses > 10%",
-      1085
+      1092
     ],
     [
       "no sell route found",
-      718
+      722
     ],
     [
       "too few sells in last hour",
-      312
+      314
     ],
     [
       "mint authority NOT revoked",
       15
     ],
     [
-      "freeze authority NOT revoked",
-      7
+      "sell tax 100 bps",
+      9
     ],
     [
-      "sell tax 100 bps",
-      6
+      "freeze authority NOT revoked",
+      7
     ],
     [
       "risky token extensions: ['transferHook', 'permanentDelegate']",
